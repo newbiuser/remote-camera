@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Remote Camera — Prototipe</title>
+<style>
+  :root { color-scheme: dark; --bg:#101827; --panel:#1b2940; --accent:#58d6a5; --muted:#aab8ca; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:20px; font-family:system-ui,-apple-system,sans-serif; background:linear-gradient(160deg,#101827,#172d3a); color:#f5f8fc; }
+  main { max-width:620px; margin:0 auto; }
+  header { text-align:center; padding:12px 0 20px; }
+  .logo { font-size:38px; }
+  h1 { margin:8px 0 4px; font-size:28px; }
+  .sub { color:var(--muted); margin:0; }
+  .panel { background:rgba(27,41,64,.95); border:1px solid #344760; border-radius:18px; padding:16px; margin:14px 0; }
+  video { display:block; width:100%; max-height:55vh; aspect-ratio:4/3; object-fit:cover; background:#080d14; border-radius:12px; }
+  .status { margin:12px 0 0; color:var(--muted); font-size:14px; }
+  .buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+  button { border:0; border-radius:12px; padding:14px 10px; font-size:15px; font-weight:700; cursor:pointer; }
+  #start { background:var(--accent); color:#08261c; }
+  #stop { background:#394b63; color:white; }
+  #flip { background:#253b55; color:white; width:100%; margin-top:10px; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .notice { font-size:13px; color:var(--muted); line-height:1.55; }
+  .pill { display:inline-block; padding:5px 9px; border-radius:999px; background:#244638; color:#a9f4d5; font-size:12px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="logo">📷</div>
+    <h1>Remote Camera</h1>
+    <p class="sub">Prototipe tahap 1 · Kamera perangkat ini</p>
+  </header>
+  <section class="panel">
+    <span class="pill">Mode uji lokal</span>
+    <h2>Pratinjau kamera</h2>
+    <video id="preview" autoplay playsinline muted></video>
+    <p id="status" class="status" role="status">Kamera belum aktif. Tekan “Aktifkan kamera” untuk memulai.</p>
+    <div class="buttons">
+      <button id="start">Aktifkan kamera</button>
+      <button id="stop" disabled>Hentikan kamera</button>
+    </div>
+    <button id="flip" disabled>Ganti kamera depan/belakang</button>
+  </section>
+  <section class="panel">
+    <h3>Catatan prototipe</h3>
+    <p class="notice">Halaman ini hanya menampilkan kamera pada perangkat yang sedang digunakan. Browser akan meminta izin kamera. Belum ada siaran ke HP lain, perekaman, atau pengiriman video.</p>
+    <p class="notice">Akses kamera browser biasanya memerlukan situs HTTPS (atau localhost). Jika file dibuka langsung dan kamera tidak berfungsi, itu bisa disebabkan pembatasan keamanan browser.</p>
+  </section>
+</main>
+<script>
+(() => {
+  const video = document.getElementById('preview');
+  const status = document.getElementById('status');
+  const start = document.getElementById('start');
+  const stop = document.getElementById('stop');
+  const flip = document.getElementById('flip');
+  let stream = null;
+  let facing = 'environment';
+
+  async function startCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      status.textContent = 'Browser ini tidak menyediakan akses kamera di halaman ini. Coba buka melalui situs HTTPS di browser modern.';
+      return;
+    }
+    start.disabled = true;
+    status.textContent = 'Meminta izin kamera…';
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facing } },
+        audio: false
+      });
+      video.srcObject = stream;
+      await video.play();
+      status.textContent = 'Kamera aktif di perangkat ini. Tekan “Hentikan kamera” jika selesai.';
+      stop.disabled = false;
+      flip.disabled = false;
+    } catch (err) {
+      let message = 'Kamera tidak dapat diaktifkan.';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') message = 'Izin kamera ditolak. Izinkan akses kamera di browser lalu coba lagi.';
+      else if (err.name === 'NotFoundError') message = 'Kamera tidak ditemukan pada perangkat ini.';
+      else if (err.name === 'NotReadableError') message = 'Kamera sedang digunakan aplikasi lain. Tutup aplikasi itu lalu coba lagi.';
+      status.textContent = message;
+    } finally {
+      start.disabled = false;
+    }
+  }
+
+  function stopCamera() {
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    stream = null;
+    video.srcObject = null;
+    stop.disabled = true;
+    flip.disabled = true;
+    status.textContent = 'Kamera dihentikan.';
+  }
+
+  async function switchCamera() {
+    const wasRunning = !!stream;
+    if (!wasRunning) return;
+    stopCamera();
+    facing = facing === 'environment' ? 'user' : 'environment';
+    await startCamera();
+  }
+
+  start.addEventListener('click', startCamera);
+  stop.addEventListener('click', stopCamera);
+  flip.addEventListener('click', switchCamera);
+  window.addEventListener('pagehide', stopCamera);
+})();
+</script>
+</body>
+</html>
